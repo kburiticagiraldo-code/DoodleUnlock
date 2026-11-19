@@ -1,12 +1,13 @@
 import os, random
 import cv2, numpy as np
+from core.words import WORDS
 
 MODEL_PATH = "model/doodle.keras"
 LABELS_PATH = "model/labels.txt"
 FAKE_MODE = not os.path.exists(MODEL_PATH)  # sin modelo = predicción falsa
 
 _model = None
-_labels = ["cat", "dog", "house", "sun", "tree", "car"]
+_labels = list(WORDS)
 
 
 def _load():
