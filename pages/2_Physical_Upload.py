@@ -1,11 +1,9 @@
 import streamlit as st, numpy as np, cv2
-from streamlit_autorefresh import st_autorefresh
 from core import game, vision
 
 st.set_page_config(page_title="Ambiente físico", page_icon="📷")
 game.init()
-st_autorefresh(interval=2000, key="poll2")
-game.handle_hardware_events()
+game.poll("poll2")
 
 st.header("📷 Ambiente físico")
 if vision.FAKE_MODE:
@@ -21,7 +19,7 @@ if not st.session_state.finished:
         if st.button("Adivinar"):
             t = vision.from_photo(img)
             if t is None:
-                st.warning("No veo trazos")
+                game.aviso("warning", "No veo trazos en la foto.")
             else:
                 game.evaluate(*vision.predict(t, st.session_state.target))
                 st.rerun()
