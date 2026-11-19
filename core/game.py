@@ -2,14 +2,23 @@ import random
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 from core import mqtt_bridge as mb
+from core.words import NOMBRES, WORDS
 
-# Etiquetas del modelo (inglés) -> palabra que ve el jugador (sin tildes por la OLED)
-NOMBRES = {"cat": "gato", "dog": "perro", "house": "casa",
-           "sun": "sol", "tree": "arbol", "car": "carro"}
-WORDS = list(NOMBRES)
 THRESHOLD = 0.70
 MAX_ACIERTOS = 3
 MAX_FALLOS = 3
+
+
+def _siguiente():
+    """Palabra nueva: sale de un mazo barajado y nunca es igual a la actual."""
+    ss = st.session_state
+    actual = ss.get("target")
+    if not ss.get("deck"):
+        ss.deck = random.sample(WORDS, len(WORDS))
+    w = ss.deck.pop()
+    if w == actual:
+        w = random.choice([x for x in WORDS if x != actual])
+    return w
 
 
 def _payload(result, guess=""):
@@ -23,7 +32,7 @@ def init():
     if "aciertos" not in ss:
         ss.aciertos = 0
         ss.fallos = 0
-        ss.target = random.choice(WORDS)
+        ss.target = _siguiente()
         ss.canvas_key = 0
         ss.finished = None      # None, "WIN" o "LOSE"
         ss.msg = None
@@ -35,7 +44,8 @@ def reset():
     ss = st.session_state
     ss.aciertos = 0
     ss.fallos = 0
-    ss.target = random.choice(WORDS)
+    ss.deck = random.sample(WORDS, len(WORDS))  # mazo nuevo cada partida
+    ss.target = _siguiente()
     ss.canvas_key += 1
     ss.finished = None
     ss.msg = None
@@ -60,6 +70,7 @@ def evaluate(label, prob):
     ss = st.session_state
     ss.canvas_key += 1  # limpia el lienzo
     nombre = NOMBRES.get(label, label)
+    objetivo = NOMBRES[ss.target]
     ss.last_try = f"IA vio '{label}' ({prob:.0%}); objetivo era '{ss.target}'"
 
     if label == ss.target and prob >= THRESHOLD:
@@ -70,17 +81,19 @@ def evaluate(label, prob):
             ss.msg = ("success", f"¡Es un {nombre}! 🔓 Cerradura desbloqueada")
             mb.publish(_payload("WIN", label))
         else:
-            ss.msg = ("success", f"¡Es un {nombre}! ({prob:.0%})")
-            ss.target = random.choice(WORDS)
+            ss.msg = ("success", f"¡Es un {nombre}! ({prob:.0%}) Nueva palabra 👇")
+            ss.target = _siguiente()
             mb.publish(_payload("MATCH", label))
     else:
         ss.fallos += 1
         if ss.fallos >= MAX_FALLOS:
             ss.finished = "LOSE"
-            ss.msg = ("error", f"Parece un {nombre}. ¡Game over!")
+            ss.msg = ("error", f"Parece un {nombre}, y era {objetivo}. ¡Game over!")
             mb.publish(_payload("LOSE", label))
         else:
-            ss.msg = ("error", f"Parece un {nombre} ({prob:.0%}). ¡Intenta otra vez!")
+            ss.msg = ("error",
+                      f"Parece un {nombre} ({prob:.0%}), y era {objetivo}. Nueva palabra 👇")
+            ss.target = _siguiente()
             mb.publish(_payload("MISMATCH", label))
 
 
