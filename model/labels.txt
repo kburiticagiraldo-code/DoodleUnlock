@@ -1,0 +1,6 @@
+cat
+dog
+house
+sun
+tree
+car
