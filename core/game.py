@@ -239,5 +239,4 @@ def render_header():
         st.markdown(f"<div class='reto'>Dibuja: <b>{NOMBRES[ss.target]}</b></div>",
                     unsafe_allow_html=True)
     else:
-        st.markdown(f"<div class='reto espera'>⏱️ ¿Listo? Tienes {TIEMPO} segundos "
-                    f"por
+        st.markdown(f"<div class='reto espera'>⏱️ ¿Listo? Tienes {TIEMPO} segundos por palabra</div>", unsafe_allow_html=True)
