@@ -15,7 +15,8 @@ def _load():
     if _model is None and not FAKE_MODE:
         import tensorflow as tf
         _model = tf.keras.models.load_model(MODEL_PATH)
-        _labels = open(LABELS_PATH).read().split("\n")
+        with open(LABELS_PATH) as f:
+            _labels = [l.strip() for l in f.read().splitlines() if l.strip()]
 
 
 def _to_tensor(bw):
@@ -44,6 +45,7 @@ def from_photo(bgr):
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
     gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
     _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    bw = cv2.dilate(bw, np.ones((3, 3), np.uint8), iterations=1)  # engrosa el trazo
     return _to_tensor(bw)
 
 
