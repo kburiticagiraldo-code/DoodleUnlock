@@ -1,12 +1,10 @@
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
-from streamlit_autorefresh import st_autorefresh
 from core import game, vision
 
 st.set_page_config(page_title="Ambiente digital", page_icon="🎨")
 game.init()
-st_autorefresh(interval=2000, key="poll")  # revisa el botón físico
-game.handle_hardware_events()
+game.poll("poll1")  # revisa el botón físico (se puede apagar en la barra lateral)
 
 st.header("🎨 Ambiente digital")
 if vision.FAKE_MODE:
@@ -15,7 +13,7 @@ if vision.FAKE_MODE:
 game.render_header()
 
 if not st.session_state.finished:
-    canvas = st_canvas(stroke_width=12, stroke_color="#FFFFFF",
+    canvas = st_canvas(stroke_width=14, stroke_color="#FFFFFF",
                        background_color="#000000", height=280, width=280,
                        drawing_mode="freedraw",
                        key=f"canvas_{st.session_state.canvas_key}")
