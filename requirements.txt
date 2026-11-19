@@ -1,1 +1,7 @@
-
+streamlit==1.35.0
+streamlit-drawable-canvas
+streamlit-autorefresh
+paho-mqtt==1.6.1
+opencv-python-headless
+numpy<2
+pillow
