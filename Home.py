@@ -6,8 +6,7 @@ game.estilo()  # mismo estilo que las otras páginas
 
 st.markdown("<div class='reto'>🔐 DoodleUnlock</div>", unsafe_allow_html=True)
 
-st.write("Dibuja la palabra que te pide el juego y una IA dirá qué cree que es. "
-         "La caja fuerte responde con luces, servo y pantalla.")
+st.write("Dibuja la palabra que te pide el juego y una IA dirá qué cree que es. ")
 
 c1, c2, c3 = st.columns(3)
 c1.metric("🟢 Para ganar", "3 aciertos")
