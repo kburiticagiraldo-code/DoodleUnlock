@@ -1,4 +1,6 @@
+import math
 import random
+import time
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_autorefresh import st_autorefresh
@@ -8,6 +10,8 @@ from core.words import NOMBRES, WORDS
 THRESHOLD = 0.70
 MAX_ACIERTOS = 3
 MAX_FALLOS = 3
+TIEMPO = 20      # segundos por palabra
+GRACIA = 1.5     # margen por la demora de red al enviar
 
 
 def _siguiente():
@@ -38,6 +42,8 @@ def init():
         ss.finished = None      # None, "WIN" o "LOSE"
         ss.msg = None
         ss.balloons = False
+        ss.playing = False      # True mientras la partida está en curso
+        ss.deadline = None
         mb.publish(_payload("NEW"))
 
 
@@ -51,7 +57,59 @@ def reset():
     ss.finished = None
     ss.msg = None
     ss.balloons = False
+    ss.playing = False
+    ss.deadline = None
     mb.publish(_payload("NEW"))
+
+
+def iniciar():
+    """Arranca la partida: corre el cronómetro de la palabra actual."""
+    ss = st.session_state
+    ss.msg = None
+    ss.playing = True
+    ss.deadline = time.time() + TIEMPO
+
+
+def jugar_de_nuevo():
+    """Botón de la app al terminar: partida nueva y arranca de una vez."""
+    reset()
+    iniciar()
+
+
+def _cerrar_ronda():
+    """Si la partida sigue, la palabra nueva arranca sola su cronómetro."""
+    ss = st.session_state
+    if ss.finished:
+        ss.playing = False
+        ss.deadline = None
+    else:
+        ss.playing = True
+        ss.deadline = time.time() + TIEMPO
+
+
+def tiempo_agotado():
+    """Se acabó el tiempo: cuenta como fallo."""
+    ss = st.session_state
+    ss.canvas_key += 1
+    ss.last_try = "Se acabó el tiempo"
+    ss.fallos += 1
+    if ss.fallos >= MAX_FALLOS:
+        ss.finished = "LOSE"
+        ss.msg = ("error", "⏰ Se acabó el tiempo. ¡Game over!")
+        mb.publish(_payload("LOSE"))
+    else:
+        ss.msg = ("error", "⏰ Se acabó el tiempo: cuenta como fallo. Nueva palabra 👇")
+        ss.target = _siguiente()
+        mb.publish(_payload("TIMEOUT"))
+    _cerrar_ronda()
+
+
+def verificar_tiempo():
+    ss = st.session_state
+    if ss.get("playing") and ss.get("deadline") \
+            and time.time() > ss.deadline + GRACIA:
+        tiempo_agotado()
+        st.rerun()
 
 
 def handle_hardware_events():
@@ -62,15 +120,19 @@ def handle_hardware_events():
 
 
 def poll(key):
-    """Escucha el botón físico. Se puede apagar desde la barra lateral."""
+    """Escucha el botón físico y vigila el cronómetro."""
+    ss = st.session_state
     if st.sidebar.toggle("Escuchar botón físico", value=True, key=f"tg_{key}"):
         st_autorefresh(interval=3000, key=key)
+    if ss.get("playing"):
+        st_autorefresh(interval=1000, key=f"reloj_{key}")  # el reloj avanza
     handle_hardware_events()
+    verificar_tiempo()
 
 
 def evaluate(label, prob):
     ss = st.session_state
-    ss.canvas_key += 1  # limpia el lienzo
+    ss.canvas_key += 1       # limpia el lienzo, la cámara y la foto subida
     nombre = NOMBRES.get(label, label)
     objetivo = NOMBRES[ss.target]
     ss.last_try = f"IA vio '{label}' ({prob:.0%}); objetivo era '{ss.target}'"
@@ -103,6 +165,7 @@ def evaluate(label, prob):
             ss.msg = ("error", f"{detalle} Nueva palabra 👇")
             ss.target = _siguiente()
             mb.publish(_payload("MISMATCH", label))
+    _cerrar_ronda()
 
 
 def aviso(tipo, texto):
@@ -146,7 +209,18 @@ def estilo():
     }
     .reto.win  { background: linear-gradient(90deg, #16A34A, #FACC15); }
     .reto.lose { background: linear-gradient(90deg, #DC2626, #7F1D1D); }
+    .reto.espera { font-size: 1.6rem; }
     .stButton > button { border-radius: 12px; font-weight: 600; }
+    .stButton > button[kind="primary"],
+    .stButton > button[data-testid="baseButton-primary"] {
+        font-size: 1.6rem; padding: .7rem 1rem; color: white; border: none;
+        background: linear-gradient(90deg, #7C5CFF, #22D3EE);
+        box-shadow: 0 4px 18px rgba(124, 92, 255, .35);
+    }
+    .stButton > button[kind="primary"]:hover,
+    .stButton > button[data-testid="baseButton-primary"]:hover {
+        filter: brightness(1.15); color: white;
+    }
     div[data-testid="stProgress"] { padding-top: .2rem; }
     </style>
     """, unsafe_allow_html=True)
@@ -155,29 +229,15 @@ def estilo():
 def render_header():
     ss = st.session_state
     estilo()
+    playing = ss.get("playing", False)
 
     if ss.finished == "WIN":
         st.markdown("<div class='reto win'>🎉 ¡GANASTE! 🔓</div>", unsafe_allow_html=True)
     elif ss.finished == "LOSE":
         st.markdown("<div class='reto lose'>💀 GAME OVER</div>", unsafe_allow_html=True)
-    else:
+    elif playing:
         st.markdown(f"<div class='reto'>Dibuja: <b>{NOMBRES[ss.target]}</b></div>",
                     unsafe_allow_html=True)
-
-    c1, c2 = st.columns(2)
-    c1.progress(ss.aciertos / MAX_ACIERTOS, text=f"🟢 Aciertos {ss.aciertos}/{MAX_ACIERTOS}")
-    c2.progress(ss.fallos / MAX_FALLOS, text=f"🔴 Fallos {ss.fallos}/{MAX_FALLOS}")
-
-    if ss.msg:
-        getattr(st, ss.msg[0])(ss.msg[1])
-    if ss.balloons:
-        fiesta()
-        ss.balloons = False
-
-    if ss.finished and st.button("Nueva partida"):
-        reset()
-        st.rerun()
-
-    with st.expander("🔧 Diagnóstico"):
-        st.write("Último mensaje MQTT:", ss.get("last_publish", "ninguno"))
-        st.write("Último intento:", ss.get("last_try", "ninguno"))
+    else:
+        st.markdown(f"<div class='reto espera'>⏱️ ¿Listo? Tienes {TIEMPO} segundos "
+                    f"por
