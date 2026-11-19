@@ -1,1 +1,23 @@
-
+NOMBRES = {
+    "cat": "gato",
+    "dog": "perro",
+    "house": "casa",
+    "sun": "sol",
+    "tree": "arbol",
+    "car": "carro",
+    "apple": "manzana",
+    "banana": "banano",
+    "bicycle": "bicicleta",
+    "clock": "reloj",
+    "cloud": "nube",
+    "fish": "pez",
+    "flower": "flor",
+    "moon": "luna",
+    "star": "estrella",
+    "umbrella": "paraguas",
+    "airplane": "avion",
+    "book": "libro",
+    "chair": "silla",
+    "guitar": "guitarra",
+}
+WORDS = list(NOMBRES)
