@@ -11,8 +11,9 @@ if vision.FAKE_MODE:
 
 game.render_header()
 
-if not st.session_state.finished:
-    f = st.file_uploader("Sube la foto de tu dibujo", type=["png", "jpg", "jpeg"])
+if st.session_state.playing:
+    f = st.file_uploader("Sube la foto de tu dibujo", type=["png", "jpg", "jpeg"],
+                         key=f"up_{st.session_state.canvas_key}")
     if f:
         img = cv2.imdecode(np.frombuffer(f.read(), np.uint8), cv2.IMREAD_COLOR)
         if img is None:
