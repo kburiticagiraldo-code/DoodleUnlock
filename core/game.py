@@ -45,6 +45,8 @@ def init():
         ss.playing = False      # True mientras la partida está en curso
         ss.deadline = None
         mb.publish(_payload("NEW"))
+    ss.setdefault("playing", False)
+    ss.setdefault("deadline", None)
 
 
 def reset():
@@ -239,4 +241,36 @@ def render_header():
         st.markdown(f"<div class='reto'>Dibuja: <b>{NOMBRES[ss.target]}</b></div>",
                     unsafe_allow_html=True)
     else:
-        st.markdown(f"<div class='reto espera'>⏱️ ¿Listo? Tienes {TIEMPO} segundos por palabra</div>", unsafe_allow_html=True)
+        espera = "⏱️ ¿Listo? Tienes {} segundos por palabra".format(TIEMPO)
+        st.markdown(f"<div class='reto espera'>{espera}</div>", unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    c1.progress(ss.aciertos / MAX_ACIERTOS, text=f"🟢 Aciertos {ss.aciertos}/{MAX_ACIERTOS}")
+    c2.progress(ss.fallos / MAX_FALLOS, text=f"🔴 Fallos {ss.fallos}/{MAX_FALLOS}")
+
+    if playing and ss.get("deadline"):
+        resta = max(0.0, ss.deadline - time.time())
+        icono = "🔥" if resta <= 5 else "⏱️"
+        st.progress(min(resta / TIEMPO, 1.0),
+                    text=f"{icono} Tiempo: {math.ceil(resta)} s")
+
+    if ss.msg:
+        getattr(st, ss.msg[0])(ss.msg[1])
+    if ss.balloons:
+        fiesta()
+        ss.balloons = False
+
+    if ss.finished:
+        if st.button("🔁  ¡VOLVER A JUGAR!", type="primary", use_container_width=True,
+                     key="btn_again"):
+            jugar_de_nuevo()
+            st.rerun()
+    elif not playing:
+        if st.button("▶  ¡INICIAR!", type="primary", use_container_width=True,
+                     key="btn_iniciar"):
+            iniciar()
+            st.rerun()
+
+    with st.expander("🔧 Diagnóstico"):
+        st.write("Último mensaje MQTT:", ss.get("last_publish", "ninguno"))
+        st.write("Último intento:", ss.get("last_try", "ninguno"))
