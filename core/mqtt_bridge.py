@@ -31,7 +31,10 @@ def get_bridge():
 
 def publish(data):
     c, _ = get_bridge()
-    c.publish(TOPIC_STATUS, json.dumps(data), qos=1)
+    info = c.publish(TOPIC_STATUS, json.dumps(data), qos=1)
+    st.session_state["last_publish"] = (
+        f"{json.dumps(data)} → rc={info.rc}, conectado={c.is_connected()}"
+    )
 
 
 def poll_events():
