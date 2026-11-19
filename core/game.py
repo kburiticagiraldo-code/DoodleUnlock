@@ -3,10 +3,33 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 from core import mqtt_bridge as mb
 from core.words import NOMBRES, WORDS
+import streamlit.components.v1 as components
 
 THRESHOLD = 0.70
 MAX_ACIERTOS = 3
 MAX_FALLOS = 3
+
+def fiesta():
+    st.balloons()
+    components.html("""
+    <script>
+    const P = window.parent;
+    function lanzar() {
+      const fin = Date.now() + 4000;
+      (function frame() {
+        P.confetti({particleCount: 7, angle: 60,  spread: 70, origin: {x: 0}});
+        P.confetti({particleCount: 7, angle: 120, spread: 70, origin: {x: 1}});
+        if (Date.now() < fin) requestAnimationFrame(frame);
+      })();
+    }
+    if (P.confetti) { lanzar(); }
+    else {
+      const s = P.document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
+      s.onload = lanzar;
+      P.document.head.appendChild(s);
+    }
+    </script>""", height=0)
 
 
 def _siguiente():
