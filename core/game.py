@@ -1,35 +1,13 @@
 import random
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit_autorefresh import st_autorefresh
 from core import mqtt_bridge as mb
 from core.words import NOMBRES, WORDS
-import streamlit.components.v1 as components
 
 THRESHOLD = 0.70
 MAX_ACIERTOS = 3
 MAX_FALLOS = 3
-
-def fiesta():
-    st.balloons()
-    components.html("""
-    <script>
-    const P = window.parent;
-    function lanzar() {
-      const fin = Date.now() + 4000;
-      (function frame() {
-        P.confetti({particleCount: 7, angle: 60,  spread: 70, origin: {x: 0}});
-        P.confetti({particleCount: 7, angle: 120, spread: 70, origin: {x: 1}});
-        if (Date.now() < fin) requestAnimationFrame(frame);
-      })();
-    }
-    if (P.confetti) { lanzar(); }
-    else {
-      const s = P.document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
-      s.onload = lanzar;
-      P.document.head.appendChild(s);
-    }
-    </script>""", height=0)
 
 
 def _siguiente():
@@ -72,6 +50,7 @@ def reset():
     ss.canvas_key += 1
     ss.finished = None
     ss.msg = None
+    ss.balloons = False
     mb.publish(_payload("NEW"))
 
 
@@ -109,13 +88,19 @@ def evaluate(label, prob):
             mb.publish(_payload("MATCH", label))
     else:
         ss.fallos += 1
+        casi = (label == ss.target)  # acertó la clase pero con poca seguridad
+        if casi:
+            detalle = (f"Casi: la IA vio {nombre} pero solo con {prob:.0%} "
+                       f"de seguridad (se necesita {THRESHOLD:.0%}).")
+        else:
+            detalle = f"Parece un {nombre} ({prob:.0%}), y era {objetivo}."
+
         if ss.fallos >= MAX_FALLOS:
             ss.finished = "LOSE"
-            ss.msg = ("error", f"Parece un {nombre}, y era {objetivo}. ¡Game over!")
+            ss.msg = ("error", f"{detalle} ¡Game over!")
             mb.publish(_payload("LOSE", label))
         else:
-            ss.msg = ("error",
-                      f"Parece un {nombre} ({prob:.0%}), y era {objetivo}. Nueva palabra 👇")
+            ss.msg = ("error", f"{detalle} Nueva palabra 👇")
             ss.target = _siguiente()
             mb.publish(_payload("MISMATCH", label))
 
@@ -126,14 +111,58 @@ def aviso(tipo, texto):
     st.rerun()
 
 
+def fiesta():
+    """Globos de Streamlit + confeti (canvas-confetti)."""
+    st.balloons()
+    components.html("""
+    <script>
+    const P = window.parent;
+    function lanzar() {
+      const fin = Date.now() + 4000;
+      (function frame() {
+        P.confetti({particleCount: 7, angle: 60,  spread: 70, origin: {x: 0}});
+        P.confetti({particleCount: 7, angle: 120, spread: 70, origin: {x: 1}});
+        if (Date.now() < fin) requestAnimationFrame(frame);
+      })();
+    }
+    if (P.confetti) { lanzar(); }
+    else {
+      const s = P.document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
+      s.onload = lanzar;
+      P.document.head.appendChild(s);
+    }
+    </script>""", height=0)
+
+
+def estilo():
+    st.markdown("""
+    <style>
+    .reto {
+        font-size: 2.3rem; text-align: center; color: white;
+        padding: .7rem 1rem; margin: .5rem 0 1rem 0; border-radius: 18px;
+        background: linear-gradient(90deg, #7C5CFF, #22D3EE);
+        box-shadow: 0 4px 18px rgba(124, 92, 255, .35);
+    }
+    .reto.win  { background: linear-gradient(90deg, #16A34A, #FACC15); }
+    .reto.lose { background: linear-gradient(90deg, #DC2626, #7F1D1D); }
+    .stButton > button { border-radius: 12px; font-weight: 600; }
+    div[data-testid="stProgress"] { padding-top: .2rem; }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 def render_header():
     ss = st.session_state
+    estilo()
+
     if ss.finished == "WIN":
-        st.subheader("🎉 ¡GANASTE!")
+        st.markdown("<div class='reto win'>🎉 ¡GANASTE! 🔓</div>", unsafe_allow_html=True)
     elif ss.finished == "LOSE":
-        st.subheader("💀 GAME OVER")
+        st.markdown("<div class='reto lose'>💀 GAME OVER</div>", unsafe_allow_html=True)
     else:
-        st.subheader(f"Dibuja: **{NOMBRES[ss.target]}**")
+        st.markdown(f"<div class='reto'>Dibuja: <b>{NOMBRES[ss.target]}</b></div>",
+                    unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     c1.progress(ss.aciertos / MAX_ACIERTOS, text=f"🟢 Aciertos {ss.aciertos}/{MAX_ACIERTOS}")
@@ -142,7 +171,7 @@ def render_header():
     if ss.msg:
         getattr(st, ss.msg[0])(ss.msg[1])
     if ss.balloons:
-        st.balloons()
+        fiesta()
         ss.balloons = False
 
     if ss.finished and st.button("Nueva partida"):
