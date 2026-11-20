@@ -10,7 +10,7 @@ from core.words import NOMBRES, WORDS
 THRESHOLD = 0.70
 MAX_ACIERTOS = 3
 MAX_FALLOS = 3
-TIEMPO = 20      # segundos por palabra
+TIEMPO = 30      # segundos por palabra
 GRACIA = 1.5     # margen por la demora de red al enviar
 
 
