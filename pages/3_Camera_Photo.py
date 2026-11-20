@@ -11,15 +11,22 @@ if vision.FAKE_MODE:
 
 game.render_header()
 
-if not st.session_state.finished:
+if st.session_state.playing:
     foto = st.camera_input("Toma una foto de tu dibujo en papel",
                            key=f"cam_{st.session_state.canvas_key}")
     if foto is not None:
         img = cv2.imdecode(np.frombuffer(foto.getvalue(), np.uint8), cv2.IMREAD_COLOR)
-        if st.button("Adivinar"):
+        if img is None:
+            st.error("No pude leer la foto. Intenta tomarla otra vez.")
+        else:
             t = vision.from_photo(img)
             if t is None:
-                game.aviso("warning", "No veo trazos. Acerca la hoja y usa un marcador grueso.")
+                st.warning("No veo trazos. Acerca la hoja, usa marcador oscuro "
+                           "grueso y buena luz.")
             else:
-                game.evaluate(*vision.predict(t, st.session_state.target))
-                st.rerun()
+                vista = cv2.resize((t[0, :, :, 0] * 255).astype(np.uint8), (140, 140),
+                                   interpolation=cv2.INTER_NEAREST)
+                st.image(vista, width=140, caption="Lo que ve la IA (28x28)")
+                if st.button("Adivinar"):
+                    game.evaluate(*vision.predict(t, st.session_state.target))
+                    st.rerun()
