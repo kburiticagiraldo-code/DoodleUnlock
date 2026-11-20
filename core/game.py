@@ -122,12 +122,17 @@ def handle_hardware_events():
 
 
 def poll(key):
-    """Escucha el botón físico y vigila el cronómetro."""
+    """Vigila el tiempo y el botón físico, sin recargar mientras se juega."""
     ss = st.session_state
-    if st.sidebar.toggle("Escuchar botón físico", value=True, key=f"tg_{key}"):
+    escuchar = st.sidebar.toggle("Escuchar botón físico", value=True,
+                                 key=f"tg_{key}")
+    if ss.get("playing") and ss.get("deadline"):
+        # Una sola recarga, justo después de que venza el tiempo
+        espera_ms = int((TIEMPO + GRACIA + 0.5) * 1000)
+        st_autorefresh(interval=espera_ms, limit=2,
+                       key=f"fin_{key}_{int(ss.deadline)}")
+    elif escuchar:
         st_autorefresh(interval=3000, key=key)
-    if ss.get("playing"):
-        st_autorefresh(interval=1000, key=f"reloj_{key}")  # el reloj avanza
     handle_hardware_events()
     verificar_tiempo()
 
@@ -200,6 +205,35 @@ def fiesta():
     </script>""", height=0)
 
 
+def reloj(resta):
+    """Cuenta regresiva dibujada por el navegador (no recarga la página)."""
+    components.html(f"""
+    <div style="font-family:sans-serif;color:#FAFAFA">
+      <div id="t" style="font-size:1.05rem;margin-bottom:6px"></div>
+      <div style="background:#1B1F2B;border-radius:8px;height:12px;overflow:hidden">
+        <div id="b" style="height:100%;width:100%;
+             background:linear-gradient(90deg,#7C5CFF,#22D3EE)"></div>
+      </div>
+    </div>
+    <script>
+      const total = {TIEMPO};
+      const fin = Date.now() + {resta:.2f} * 1000;
+      function pintar() {{
+        const r = Math.max(0, (fin - Date.now()) / 1000);
+        const icono = r <= 5 ? '🔥' : '⏱️';
+        document.getElementById('t').textContent =
+          icono + ' Tiempo: ' + Math.ceil(r) + ' s';
+        const b = document.getElementById('b');
+        b.style.width = (100 * r / total) + '%';
+        if (r <= 5) {{
+          b.style.background = 'linear-gradient(90deg,#DC2626,#F59E0B)';
+        }}
+      }}
+      pintar();
+      setInterval(pintar, 100);
+    </script>""", height=60)
+
+
 def estilo():
     st.markdown("""
     <style>
@@ -234,25 +268,27 @@ def render_header():
     playing = ss.get("playing", False)
 
     if ss.finished == "WIN":
-        st.markdown("<div class='reto win'>🎉 ¡GANASTE! 🔓</div>", unsafe_allow_html=True)
+        st.markdown("<div class='reto win'>🎉 ¡GANASTE! 🔓</div>",
+                    unsafe_allow_html=True)
     elif ss.finished == "LOSE":
-        st.markdown("<div class='reto lose'>💀 GAME OVER</div>", unsafe_allow_html=True)
+        st.markdown("<div class='reto lose'>💀 GAME OVER</div>",
+                    unsafe_allow_html=True)
     elif playing:
         st.markdown(f"<div class='reto'>Dibuja: <b>{NOMBRES[ss.target]}</b></div>",
                     unsafe_allow_html=True)
     else:
         espera = "⏱️ ¿Listo? Tienes {} segundos por palabra".format(TIEMPO)
-        st.markdown(f"<div class='reto espera'>{espera}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='reto espera'>{espera}</div>",
+                    unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
-    c1.progress(ss.aciertos / MAX_ACIERTOS, text=f"🟢 Aciertos {ss.aciertos}/{MAX_ACIERTOS}")
-    c2.progress(ss.fallos / MAX_FALLOS, text=f"🔴 Fallos {ss.fallos}/{MAX_FALLOS}")
+    c1.progress(ss.aciertos / MAX_ACIERTOS,
+                text=f"🟢 Aciertos {ss.aciertos}/{MAX_ACIERTOS}")
+    c2.progress(ss.fallos / MAX_FALLOS,
+                text=f"🔴 Fallos {ss.fallos}/{MAX_FALLOS}")
 
     if playing and ss.get("deadline"):
-        resta = max(0.0, ss.deadline - time.time())
-        icono = "🔥" if resta <= 5 else "⏱️"
-        st.progress(min(resta / TIEMPO, 1.0),
-                    text=f"{icono} Tiempo: {math.ceil(resta)} s")
+        reloj(max(0.0, ss.deadline - time.time()))
 
     if ss.msg:
         getattr(st, ss.msg[0])(ss.msg[1])
@@ -261,13 +297,13 @@ def render_header():
         ss.balloons = False
 
     if ss.finished:
-        if st.button("🔁  ¡VOLVER A JUGAR!", type="primary", use_container_width=True,
-                     key="btn_again"):
+        if st.button("🔁  ¡VOLVER A JUGAR!", type="primary",
+                     use_container_width=True, key="btn_again"):
             jugar_de_nuevo()
             st.rerun()
     elif not playing:
-        if st.button("▶  ¡INICIAR!", type="primary", use_container_width=True,
-                     key="btn_iniciar"):
+        if st.button("▶  ¡INICIAR!", type="primary",
+                     use_container_width=True, key="btn_iniciar"):
             iniciar()
             st.rerun()
 
